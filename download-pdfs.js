@@ -21,7 +21,7 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function randomDelay(minMs = 1000, maxMs = 3000) {
+function randomDelay(minMs = 500, maxMs = 1500) {
   return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
 }
 
@@ -105,24 +105,25 @@ function buildOutputPaths(node) {
   };
 }
 
-async function downloadPdf(browser, url, filePath) {
-  const page = await browser.newPage();
+async function downloadPdf(page, url, filePath) {
+  let body = null;
+  let status = null;
+  let contentType = null;
+
+  const onResponse = async (response) => {
+    if (response.url() !== url) return;
+    status = response.status();
+    contentType = response.headers()['content-type'] || '';
+    try {
+      body = await response.body();
+    } catch (err) {
+      console.error(`  Failed to read response body: ${err.message}`);
+    }
+  };
+
+  page.on('response', onResponse);
+
   try {
-    let body = null;
-    let status = null;
-    let contentType = null;
-
-    page.on('response', async (response) => {
-      if (response.url() !== url) return;
-      status = response.status();
-      contentType = response.headers()['content-type'] || '';
-      try {
-        body = await response.body();
-      } catch (err) {
-        console.error(`  Failed to read response body: ${err.message}`);
-      }
-    });
-
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120000 });
     } catch (err) {
@@ -131,7 +132,7 @@ async function downloadPdf(browser, url, filePath) {
       }
     }
 
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(500);
 
     if (!body) {
       throw new Error('No response body captured');
@@ -145,7 +146,7 @@ async function downloadPdf(browser, url, filePath) {
 
     fs.writeFileSync(filePath, body);
   } finally {
-    await page.close();
+    page.off('response', onResponse);
   }
 }
 
@@ -221,6 +222,7 @@ function sortNodes(nodes) {
   console.log(`Found ${nodes.length.toLocaleString()} transmission nodes.`);
 
   const browser = await firefox.launch({ headless: process.env.HEADLESS !== 'false' });
+  const page = await browser.newPage();
 
   try {
     for (let i = 0; i < nodes.length; i++) {
@@ -238,7 +240,7 @@ function sortNodes(nodes) {
       console.log(`  Location: ${location.department} > ${location.municipality} > ${location.zone} > ${location.stand} (table ${node.numberStand})`);
       try {
         const downloadStartedAt = Date.now();
-        await downloadPdf(browser, url, pdfPath);
+        await downloadPdf(page, url, pdfPath);
         const size = fs.statSync(pdfPath).size;
         const xmp = await extractXmpMetadata(pdfPath);
         const downloadedAt = new Date().toISOString();
@@ -259,6 +261,7 @@ function sortNodes(nodes) {
       }
     }
   } finally {
+    await page.close();
     await browser.close();
     await exiftool.end();
   }
