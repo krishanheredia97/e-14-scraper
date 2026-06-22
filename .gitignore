@@ -4,3 +4,4 @@ node_modules/
 *.log
 allTransmissionCodes.json
 departmentsTree.json
+pdfs/
