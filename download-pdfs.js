@@ -101,7 +101,7 @@ function buildOutputPaths(node) {
   const baseName = fileName.replace(/\.pdf$/i, '');
   return {
     pdfPath: path.join(PDF_DIR, fileName),
-    metadataPath: path.join(METADATA_DIR, `${baseName}.txt`),
+    metadataPath: path.join(METADATA_DIR, `${baseName}.json`),
   };
 }
 
@@ -157,28 +157,28 @@ async function extractXmpMetadata(filePath) {
   return { present: false, content: 'No XMP metadata found in this PDF.' };
 }
 
-function writeMetadata(metadataPath, { url, size, xmp, node, location, downloadedAt }) {
-  const lines = [
-    `file: ${path.basename(metadataPath, '.txt')}.pdf`,
-    `url: ${url}`,
-    `sizeBytes: ${size}`,
-    `downloadedAt: ${downloadedAt}`,
-    `department: ${location.department}`,
-    `municipality: ${location.municipality}`,
-    `zone: ${location.zone}`,
-    `stand: ${location.stand}`,
-    `idDepartmentCode: ${node.idDepartmentCode}`,
-    `municipalityCode: ${node.municipalityCode}`,
-    `idZoneCode: ${node.idZoneCode}`,
-    `idCorporationCode: ${node.idCorporationCode}`,
-    `standCode: ${node.standCode}`,
-    `numberStand: ${node.numberStand}`,
-    `idTransmissionCode: ${node.idTransmissionCode}`,
-    `xmpPresent: ${xmp.present}`,
-    '---',
-    xmp.content,
-  ];
-  fs.writeFileSync(metadataPath, lines.join('\n') + '\n');
+function writeMetadata(metadataPath, { url, size, xmp, node, location, downloadedAt, downloadDurationMs }) {
+  const payload = {
+    file: `${path.basename(metadataPath, '.json')}.pdf`,
+    url,
+    sizeBytes: size,
+    downloadedAt,
+    downloadDurationMs,
+    department: location.department,
+    municipality: location.municipality,
+    zone: location.zone,
+    stand: location.stand,
+    idDepartmentCode: node.idDepartmentCode,
+    municipalityCode: node.municipalityCode,
+    idZoneCode: node.idZoneCode,
+    idCorporationCode: node.idCorporationCode,
+    standCode: node.standCode,
+    numberStand: node.numberStand,
+    idTransmissionCode: node.idTransmissionCode,
+    xmpPresent: xmp.present,
+    xmpContent: xmp.content,
+  };
+  fs.writeFileSync(metadataPath, JSON.stringify(payload, null, 2) + '\n');
 }
 
 function logError({ node, location, url, error }) {
@@ -237,11 +237,13 @@ function sortNodes(nodes) {
       console.log(`[${i + 1}/${nodes.length}] ${url}`);
       console.log(`  Location: ${location.department} > ${location.municipality} > ${location.zone} > ${location.stand} (table ${node.numberStand})`);
       try {
+        const downloadStartedAt = Date.now();
         await downloadPdf(browser, url, pdfPath);
         const size = fs.statSync(pdfPath).size;
         const xmp = await extractXmpMetadata(pdfPath);
         const downloadedAt = new Date().toISOString();
-        writeMetadata(metadataPath, { url, size, xmp, node, location, downloadedAt });
+        const downloadDurationMs = Date.now() - downloadStartedAt;
+        writeMetadata(metadataPath, { url, size, xmp, node, location, downloadedAt, downloadDurationMs });
         console.log(`  Saved: ${path.basename(pdfPath)} (${size.toLocaleString()} bytes)`);
         console.log(`  XMP present: ${xmp.present}`);
       } catch (err) {
