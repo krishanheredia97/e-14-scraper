@@ -1,28 +1,40 @@
 require('dotenv').config();
 const { webkit } = require('playwright');
+const { BASE_URL, DEPARTMENTS } = require('./constants');
 
 (async () => {
   const headless = process.env.HEADLESS !== 'false';
-  const url = 'https://e14segundavueltapresidente.registraduria.gov.co/home';
+  const appEnv = process.env.APP_ENV || 'prod';
+  const devDpto = process.env.DEV_DPTO;
+
+  const departments =
+    appEnv === 'dev' && devDpto
+      ? DEPARTMENTS.filter(
+          (d) => parseInt(d.code, 10) === parseInt(devDpto, 10)
+        )
+      : DEPARTMENTS;
+
+  if (appEnv === 'dev' && (!devDpto || departments.length === 0)) {
+    console.error(
+      'DEV mode requires DEV_DPTO to match one of the known department codes.'
+    );
+    process.exitCode = 1;
+    return;
+  }
 
   const browser = await webkit.launch({ headless });
-  const page = await browser.newPage();
 
   try {
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 120000 });
+    for (const dept of departments) {
+      const page = await browser.newPage();
+      const url = `${BASE_URL}/departamento/${dept.code.padStart(2, '0')}`;
 
-    await page.waitForSelector('.table-container .tbody .data-row', { timeout: 30000 });
+      console.log(`Opening ${dept.name}: ${url}`);
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 120000 });
+      console.log(`Loaded ${dept.name}`);
 
-    const departamentos = await page.$$eval(
-      '.table-container .tbody .data-row .td.departamento a',
-      (links) => links.map((link) => ({
-        nombre: link.textContent.trim(),
-        href: link.getAttribute('href'),
-      }))
-    );
-
-    console.log('Departamentos:');
-    departamentos.forEach(({ nombre, href }) => console.log(`${nombre}: ${href}`));
+      await page.close();
+    }
   } catch (error) {
     console.error('Error:', error.message);
     process.exitCode = 1;
