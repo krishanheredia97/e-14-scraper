@@ -15,11 +15,14 @@ const { webkit } = require('playwright');
 
     const departamentos = await page.$$eval(
       '.table-container .tbody .data-row .td.departamento a',
-      (links) => links.map((link) => link.textContent.trim())
+      (links) => links.map((link) => ({
+        nombre: link.textContent.trim(),
+        href: link.getAttribute('href'),
+      }))
     );
 
     console.log('Departamentos:');
-    departamentos.forEach((departamento) => console.log(departamento));
+    departamentos.forEach(({ nombre, href }) => console.log(`${nombre}: ${href}`));
   } catch (error) {
     console.error('Error:', error.message);
     process.exitCode = 1;
