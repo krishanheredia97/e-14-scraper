@@ -7,8 +7,9 @@ const { BASE_URL } = require('./constants');
 
 const exiftool = new ExifTool();
 
-const OUTPUT_DIR = path.join(__dirname, 'pdfs');
-const LIMIT = 5;
+const PDF_DIR = path.join(__dirname, 'pdfs');
+const METADATA_DIR = path.join(__dirname, 'metadata');
+const LOG_FILE = path.join(__dirname, 'download-errors.log');
 
 const departmentsTree = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'departmentsTree.json'), 'utf8')
@@ -22,15 +23,6 @@ function sleep(ms) {
 
 function randomDelay(minMs = 1000, maxMs = 3000) {
   return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
-}
-
-function shuffleArray(array) {
-  const copy = [...array];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
 }
 
 function buildLookupTree(tree) {
@@ -93,22 +85,23 @@ function buildPdfUrl(node) {
   return `${BASE_URL}/assets/temis/pdf/${dept}/${municipality}/${zone}/${stand}/${numberStand}/PRE/${pdfName}`;
 }
 
-function buildOutputDir(node) {
+function buildFileName(node) {
   const dept = node.idDepartmentCode.padStart(2, '0');
   const municipality = node.municipalityCode.padStart(3, '0');
   const zone = node.idZoneCode.padStart(3, '0');
   const stand = node.standCode.padStart(2, '0');
   const numberStand = node.numberStand.padStart(3, '0');
-  return path.join(OUTPUT_DIR, dept, municipality, zone, stand, numberStand);
+  const corporation = node.idCorporationCode;
+  const id = `${dept}-${municipality}-${zone}-${stand}-${numberStand}-${corporation}`;
+  return `${id}-${node.expectedName}`;
 }
 
 function buildOutputPaths(node) {
-  const dir = buildOutputDir(node);
-  const pdfName = node.expectedName;
+  const fileName = buildFileName(node);
+  const baseName = fileName.replace(/\.pdf$/i, '');
   return {
-    dir,
-    pdfPath: path.join(dir, pdfName),
-    metadataPath: path.join(dir, pdfName.replace(/\.pdf$/i, '') + '_metadata.txt'),
+    pdfPath: path.join(PDF_DIR, fileName),
+    metadataPath: path.join(METADATA_DIR, `${baseName}.txt`),
   };
 }
 
@@ -164,11 +157,12 @@ async function extractXmpMetadata(filePath) {
   return { present: false, content: 'No XMP metadata found in this PDF.' };
 }
 
-function writeMetadata(metadataPath, { url, size, xmp, node, location }) {
+function writeMetadata(metadataPath, { url, size, xmp, node, location, downloadedAt }) {
   const lines = [
-    `file: ${path.basename(metadataPath, '_metadata.txt')}.pdf`,
+    `file: ${path.basename(metadataPath, '.txt')}.pdf`,
     `url: ${url}`,
     `sizeBytes: ${size}`,
+    `downloadedAt: ${downloadedAt}`,
     `department: ${location.department}`,
     `municipality: ${location.municipality}`,
     `zone: ${location.zone}`,
@@ -187,42 +181,76 @@ function writeMetadata(metadataPath, { url, size, xmp, node, location }) {
   fs.writeFileSync(metadataPath, lines.join('\n') + '\n');
 }
 
+function logError({ node, location, url, error }) {
+  const timestamp = new Date().toISOString();
+  const line = [
+    `timestamp: ${timestamp}`,
+    `url: ${url}`,
+    `error: ${error}`,
+    `department: ${location.department}`,
+    `municipality: ${location.municipality}`,
+    `zone: ${location.zone}`,
+    `stand: ${location.stand}`,
+    `idDepartmentCode: ${node.idDepartmentCode}`,
+    `municipalityCode: ${node.municipalityCode}`,
+    `idZoneCode: ${node.idZoneCode}`,
+    `idCorporationCode: ${node.idCorporationCode}`,
+    `standCode: ${node.standCode}`,
+    `numberStand: ${node.numberStand}`,
+    `idTransmissionCode: ${node.idTransmissionCode}`,
+    '---',
+  ].join('\n') + '\n';
+  fs.appendFileSync(LOG_FILE, line);
+}
+
+function sortNodes(nodes) {
+  return [...nodes].sort((a, b) => {
+    const aUrl = buildPdfUrl(a);
+    const bUrl = buildPdfUrl(b);
+    return aUrl.localeCompare(bUrl);
+  });
+}
+
 (async () => {
-  if (!fs.existsSync(OUTPUT_DIR)) {
-    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-  }
+  fs.mkdirSync(PDF_DIR, { recursive: true });
+  fs.mkdirSync(METADATA_DIR, { recursive: true });
 
   const { data } = JSON.parse(fs.readFileSync('allTransmissionCodes.json', 'utf8'));
-  const nodes = shuffleArray([...data.status3.nodes, ...data.status11.nodes]);
+  const nodes = sortNodes([...data.status3.nodes, ...data.status11.nodes]);
 
   console.log(`Found ${nodes.length.toLocaleString()} transmission nodes.`);
-  console.log(`Downloading ${LIMIT} random PDF(s)...\n`);
 
   const browser = await firefox.launch({ headless: process.env.HEADLESS !== 'false' });
 
   try {
-    for (let i = 0; i < Math.min(LIMIT, nodes.length); i++) {
+    for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];
       const url = buildPdfUrl(node);
       const location = lookupLocation(node);
-      const { dir, pdfPath, metadataPath } = buildOutputPaths(node);
+      const { pdfPath, metadataPath } = buildOutputPaths(node);
 
-      console.log(`[${i + 1}/${LIMIT}] ${url}`);
+      if (fs.existsSync(pdfPath)) {
+        console.log(`[${i + 1}/${nodes.length}] SKIP (already downloaded): ${path.basename(pdfPath)}`);
+        continue;
+      }
+
+      console.log(`[${i + 1}/${nodes.length}] ${url}`);
       console.log(`  Location: ${location.department} > ${location.municipality} > ${location.zone} > ${location.stand} (table ${node.numberStand})`);
       try {
-        fs.mkdirSync(dir, { recursive: true });
         await downloadPdf(browser, url, pdfPath);
         const size = fs.statSync(pdfPath).size;
         const xmp = await extractXmpMetadata(pdfPath);
-        writeMetadata(metadataPath, { url, size, xmp, node, location });
-        console.log(`  Saved: ${path.relative(OUTPUT_DIR, pdfPath)} (${size.toLocaleString()} bytes)`);
+        const downloadedAt = new Date().toISOString();
+        writeMetadata(metadataPath, { url, size, xmp, node, location, downloadedAt });
+        console.log(`  Saved: ${path.basename(pdfPath)} (${size.toLocaleString()} bytes)`);
         console.log(`  XMP present: ${xmp.present}`);
       } catch (err) {
         console.error(`  ERROR: ${err.message}`);
         console.error(`  Lookup for manual verification: ${location.department} > ${location.municipality} > ${location.zone} > ${location.stand} (table ${node.numberStand})`);
+        logError({ node, location, url, error: err.message });
       }
 
-      if (i < Math.min(LIMIT, nodes.length) - 1) {
+      if (i < nodes.length - 1) {
         const delay = randomDelay();
         console.log(`  Sleeping ${delay}ms...`);
         await sleep(delay);

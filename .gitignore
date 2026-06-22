@@ -5,3 +5,4 @@ node_modules/
 allTransmissionCodes.json
 departmentsTree.json
 pdfs/
+metadata/
