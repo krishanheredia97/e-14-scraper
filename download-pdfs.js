@@ -2,7 +2,10 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { firefox } = require('playwright');
+const { ExifTool } = require('exiftool-vendored');
 const { BASE_URL } = require('./constants');
+
+const exiftool = new ExifTool();
 
 const OUTPUT_DIR = path.join(__dirname, 'pdfs');
 const LIMIT = 1;
@@ -69,6 +72,30 @@ async function downloadPdf(browser, url, filePath) {
   }
 }
 
+function writeMetadata(filePath, url, size) {
+  const metadataPath = filePath.replace(/\.pdf$/i, '') + '_metadata.txt';
+  const lines = [
+    `file: ${path.basename(filePath)}`,
+    `url: ${url}`,
+    `sizeBytes: ${size}`,
+  ];
+  fs.writeFileSync(metadataPath, lines.join('\n') + '\n');
+}
+
+async function extractPdfMetadata(filePath) {
+  const tags = await exiftool.read(filePath);
+  const pick = ['Title', 'Author', 'Creator', 'Producer', 'CreateDate', 'ModifyDate', 'FileSize', 'PDFVersion', 'PageCount'];
+  const lines = pick
+    .filter((key) => tags[key] !== undefined)
+    .map((key) => `${key}: ${tags[key]}`);
+  if (tags.errors && tags.errors.length) {
+    lines.push(`errors: ${tags.errors.join('; ')}`);
+  }
+  const metadataPath = filePath.replace(/\.pdf$/i, '') + '_metadata.txt';
+  fs.writeFileSync(metadataPath, lines.join('\n') + '\n');
+  return lines;
+}
+
 (async () => {
   if (!fs.existsSync(OUTPUT_DIR)) {
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -93,7 +120,9 @@ async function downloadPdf(browser, url, filePath) {
       try {
         await downloadPdf(browser, url, filePath);
         const size = fs.statSync(filePath).size;
+        const pdfMetaLines = await extractPdfMetadata(filePath);
         console.log(`  Saved: ${fileName} (${size.toLocaleString()} bytes)`);
+        if (pdfMetaLines.length) console.log(`  Metadata saved.`);
       } catch (err) {
         console.error(`  ERROR: ${err.message}`);
       }
@@ -106,6 +135,7 @@ async function downloadPdf(browser, url, filePath) {
     }
   } finally {
     await browser.close();
+    await exiftool.end();
   }
 
   console.log('\nDone.');
