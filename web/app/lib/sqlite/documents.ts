@@ -79,3 +79,22 @@ export function getDocumentByFileName(fileName: string) {
   const stmt = db.prepare("SELECT id, file_name, url FROM documents WHERE file_name = ?");
   return stmt.get(fileName) as { id: number; file_name: string; url: string } | undefined;
 }
+
+export interface DocumentMetadata {
+  id: number;
+  file_name: string;
+  url: string;
+  department: string | null;
+  municipality: string | null;
+  zone: string | null;
+  stand: string | null;
+  size_bytes: number | null;
+}
+
+export function getDocumentMetadataByFileName(fileName: string): DocumentMetadata | undefined {
+  const db = getDatabase();
+  const stmt = db.prepare(
+    "SELECT id, file_name, url, department, municipality, zone, stand, size_bytes FROM documents WHERE file_name = ?",
+  );
+  return stmt.get(fileName) as DocumentMetadata | undefined;
+}
