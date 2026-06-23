@@ -1,4 +1,4 @@
-import { getDocumentByFileName } from "../../lib/sqlite/documents";
+import { getDocumentMetadataByFileName } from "../../lib/metadata";
 import { upsertFlag, getFlagCounts, type FlagType } from "../../lib/sqlite/flags";
 
 const VALID_FLAG_TYPES: FlagType[] = ["error", "fraud", "ok"];
@@ -24,13 +24,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const document = getDocumentByFileName(fileName);
-    if (!document) {
+    const metadata = await getDocumentMetadataByFileName(fileName);
+    if (!metadata) {
       return Response.json({ error: "Document not found" }, { status: 404 });
     }
 
-    const { changed } = upsertFlag(document.id, flagType, fingerprint);
-    const counts = getFlagCounts(document.id);
+    const { changed } = upsertFlag(fileName, flagType, fingerprint);
+    const counts = getFlagCounts(fileName);
 
     return Response.json({
       success: true,

@@ -6,8 +6,10 @@ export async function GET(request: Request) {
     const limit = Math.min(parseInt(searchParams.get("limit") ?? "100", 10), 500);
     const offset = Math.max(parseInt(searchParams.get("offset") ?? "0", 10), 0);
 
-    const alerts = getAlerts({ limit, offset });
-    const total = getTotalAlertCount();
+    const [alerts, total] = await Promise.all([
+      getAlerts({ limit, offset }),
+      getTotalAlertCount(),
+    ]);
 
     return Response.json({ alerts, total });
   } catch (error) {

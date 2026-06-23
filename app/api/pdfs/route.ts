@@ -1,8 +1,8 @@
-import { getRandomBatch } from "../../lib/pdfs";
+import { getRandomBatch } from "../../lib/metadata";
 
 export async function GET() {
   try {
-    const { names, metadata, total } = getRandomBatch(10);
+    const { names, metadata, total } = await getRandomBatch(10);
     return Response.json({ pdfs: names, metadata, total });
   } catch (error) {
     return Response.json(

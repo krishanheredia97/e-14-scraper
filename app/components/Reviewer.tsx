@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Header from "./Header";
-import type { DocumentMetadata } from "../lib/types";
+import type { DocumentMetadata } from "../lib/metadata";
 
 const PRELOAD_AHEAD = 3;
 const LOW_QUEUE_THRESHOLD = 5;

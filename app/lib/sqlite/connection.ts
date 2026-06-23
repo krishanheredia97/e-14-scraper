@@ -1,7 +1,6 @@
 import Database from "better-sqlite3";
 import { mkdirSync, readFileSync } from "fs";
 import path from "path";
-import { syncDocumentsFromMetadata } from "./documents";
 
 function getDataDirectory(): string {
   if (process.env.DATA_DIR) {
@@ -42,8 +41,6 @@ export function getDatabase(): Database.Database {
 
     initializeSchema(db);
     db.pragma("foreign_keys = ON");
-
-    syncDocuments();
 
     const FIVE_MINUTES_MS = 5 * 60 * 1000;
     setInterval(() => {
@@ -87,7 +84,11 @@ function initializeSchema(database: Database.Database): void {
     )
   `);
 
-  const migrationFiles = ["001_initial_schema.sql", "002_add_stand_code.sql"];
+  const migrationFiles = [
+    "001_initial_schema.sql",
+    "002_add_stand_code.sql",
+    "003_remove_documents_table.sql",
+  ];
 
   for (const filename of migrationFiles) {
     try {
@@ -123,20 +124,6 @@ function initializeSchema(database: Database.Database): void {
   }
 
   database.pragma("foreign_keys = ON");
-}
-
-function syncDocuments(): void {
-  syncDocumentsFromMetadata()
-    .then((result) => {
-      if (result.inserted > 0) {
-        console.log(
-          `Synced documents: ${result.inserted} inserted, ${result.skipped} already present`,
-        );
-      }
-    })
-    .catch((error) => {
-      console.error("Failed to sync documents:", error);
-    });
 }
 
 process.on("SIGINT", () => {

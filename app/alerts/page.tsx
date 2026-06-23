@@ -4,7 +4,7 @@ import { getAlerts, type AlertRow } from "../lib/sqlite/flags";
 export const dynamic = "force-dynamic";
 
 export default async function AlertsPage() {
-  const alerts = getAlerts({ limit: 500 });
+  const alerts = await getAlerts({ limit: 500 });
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
@@ -46,7 +46,7 @@ export default async function AlertsPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {alerts.map((alert) => (
-                    <AlertRow key={alert.id} alert={alert} />
+                    <AlertRow key={alert.file_name} alert={alert} />
                   ))}
                 </tbody>
               </table>

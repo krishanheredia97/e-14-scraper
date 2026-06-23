@@ -1,4 +1,4 @@
-import { getDocumentMetadataByFileName } from "../../../lib/sqlite/documents";
+import { getDocumentMetadataByFileName } from "../../../lib/metadata";
 
 export async function GET(
   _request: Request,
@@ -7,7 +7,7 @@ export async function GET(
   try {
     const { fileName } = await params;
     const decoded = decodeURIComponent(fileName);
-    const metadata = getDocumentMetadataByFileName(decoded);
+    const metadata = await getDocumentMetadataByFileName(decoded);
 
     if (!metadata) {
       return Response.json({ error: "Document not found" }, { status: 404 });
