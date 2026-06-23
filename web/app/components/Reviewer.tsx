@@ -46,6 +46,47 @@ function ChevronRight(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+function Toggle({
+  checked,
+  onChange,
+  labelLeft,
+  labelRight,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  labelLeft: string;
+  labelRight: string;
+}) {
+  return (
+    <div
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="relative inline-flex h-8 w-48 cursor-pointer items-center rounded-full bg-neutral-200 p-1 transition-colors"
+    >
+      <span
+        className={`absolute left-1 top-1 h-6 w-[calc(50%-0.25rem)] rounded-full bg-white shadow transition-transform ${
+          checked ? "translate-x-full" : "translate-x-0"
+        }`}
+      />
+      <span
+        className={`z-10 flex-1 text-center text-xs font-medium transition-colors ${
+          checked ? "text-neutral-500" : "text-neutral-900"
+        }`}
+      >
+        {labelLeft}
+      </span>
+      <span
+        className={`z-10 flex-1 text-center text-xs font-medium transition-colors ${
+          checked ? "text-neutral-900" : "text-neutral-500"
+        }`}
+      >
+        {labelRight}
+      </span>
+    </div>
+  );
+}
+
 export default function Reviewer({ initialBatch, totalAvailable }: ReviewerProps) {
   const [queue, setQueue] = useState<string[]>(initialBatch);
   const [index, setIndex] = useState(0);
@@ -63,6 +104,10 @@ export default function Reviewer({ initialBatch, totalAvailable }: ReviewerProps
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(
     null
   );
+
+  const [zoomedOut, setZoomedOut] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
+  if (!hasMounted) setHasMounted(true);
 
   const currentPdf = queue[index];
   const totalInQueue = queue.length;
@@ -156,7 +201,15 @@ export default function Reviewer({ initialBatch, totalAvailable }: ReviewerProps
       ))}
 
       <header className="flex items-center justify-between px-4 py-3 border-b border-neutral-200 bg-white shrink-0">
-        <h1 className="font-semibold text-lg">Revisión Actas E-14</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="font-semibold text-lg">Revisión Actas E-14</h1>
+          <Toggle
+            checked={zoomedOut}
+            onChange={setZoomedOut}
+            labelLeft="Normal"
+            labelRight="Vista completa"
+          />
+        </div>
         <div className="text-sm text-neutral-600">
           {currentPdf ? (
             <>
@@ -181,13 +234,13 @@ export default function Reviewer({ initialBatch, totalAvailable }: ReviewerProps
               <button
                 aria-label="Anterior"
                 onClick={prevPdf}
-                disabled={index === 0}
+                disabled={hasMounted && index === 0}
                 className="absolute left-3 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/90 shadow hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="h-8 w-8" />
               </button>
 
-              <div className="h-[85vh] w-[min(45vw,650px)]">
+              <div className={zoomedOut ? "h-[95vh] w-[min(95vw,1400px)]" : "h-[85vh] w-[min(45vw,650px)]"}>
                 {loadError ? (
                   <div className="h-full flex flex-col items-center justify-center gap-4 rounded-xl border border-neutral-700 bg-neutral-800 text-white">
                     <p>No se pudo cargar el PDF.</p>
@@ -201,7 +254,7 @@ export default function Reviewer({ initialBatch, totalAvailable }: ReviewerProps
                 ) : (
                   <iframe
                     key={pdfUrl}
-                    src={pdfUrl}
+                    src={`${pdfUrl}${zoomedOut ? "#zoom=page-fit" : ""}`}
                     title={`Acta ${currentPdf}`}
                     className="h-full w-full rounded-lg border border-neutral-700 bg-neutral-900"
                     onError={() => setLoadError(true)}
