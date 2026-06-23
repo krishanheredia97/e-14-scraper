@@ -165,13 +165,6 @@ function getOrCreateFingerprint(): string {
   return fingerprint;
 }
 
-function formatFileSize(bytes: number | null): string {
-  if (bytes === null || bytes === undefined) return "—";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-}
-
 export default function Reviewer({
   initialBatch,
   initialMetadata,
@@ -332,14 +325,14 @@ export default function Reviewer({
 
       <Header />
 
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-white/80 backdrop-blur shrink-0">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-200 bg-white/80 backdrop-blur shrink-0 flex-wrap sm:flex-nowrap">
         <Toggle
           checked={zoomedOut}
           onChange={setZoomedOut}
           labelLeft="Normal"
           labelRight="Vista completa"
         />
-        <div className="text-sm font-medium text-slate-600">
+        <div className="text-sm font-medium text-slate-600 w-full sm:w-auto text-right">
           {currentPdf ? (
             <>
               PDF {index + 1} de {totalInQueue} en cola
@@ -351,24 +344,24 @@ export default function Reviewer({
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        <main className="flex-1 relative bg-slate-950 flex items-center justify-center overflow-hidden">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        <main className="flex-1 relative bg-slate-950 flex items-center justify-center overflow-hidden min-h-[50vh] lg:min-h-0">
           {currentPdf ? (
             <>
               <button
                 aria-label="Anterior"
                 onClick={prevPdf}
                 disabled={isPrevDisabled}
-                className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/95 text-slate-800 shadow-lg hover:bg-white hover:scale-105 transition disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100"
+                className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-10 p-2 sm:p-3 rounded-full bg-white/95 text-slate-800 shadow-lg hover:bg-white hover:scale-105 transition disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
-                <ChevronLeft className="h-7 w-7" />
+                <ChevronLeft className="h-6 w-6 sm:h-7 sm:w-7" />
               </button>
 
               <div
                 className={
                   zoomedOut
-                    ? "h-[96vh] w-[min(96vw,1500px)]"
-                    : "h-[86vh] w-[min(48vw,720px)]"
+                    ? "h-[70vh] lg:h-[96vh] w-[96vw] lg:w-[min(96vw,1500px)]"
+                    : "h-[70vh] lg:h-[86vh] w-[90vw] lg:w-[min(48vw,720px)]"
                 }
               >
                 {loadError ? (
@@ -379,7 +372,7 @@ export default function Reviewer({
                     <p className="text-lg font-medium">No se pudo cargar el PDF</p>
                     <button
                       onClick={() => setLoadError(false)}
-                      className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition shadow-lg shadow-blue-900/20"
+                      className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 transition shadow-lg shadow-blue-900/20 cursor-pointer"
                     >
                       Intentar de nuevo
                     </button>
@@ -398,13 +391,13 @@ export default function Reviewer({
               <button
                 aria-label="Siguiente"
                 onClick={nextPdf}
-                className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/95 text-slate-800 shadow-lg hover:bg-white hover:scale-105 transition"
+                className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-10 p-2 sm:p-3 rounded-full bg-white/95 text-slate-800 shadow-lg hover:bg-white hover:scale-105 transition"
               >
-                <ChevronRight className="h-7 w-7" />
+                <ChevronRight className="h-6 w-6 sm:h-7 sm:w-7" />
               </button>
             </>
           ) : (
-            <div className="text-center text-slate-300">
+            <div className="text-center text-slate-300 px-4">
               <p className="text-lg">No hay PDFs disponibles.</p>
               <p className="text-sm text-slate-500 mt-2">
                 Asegúrate de que los archivos estén en la carpeta{" "}
@@ -415,7 +408,7 @@ export default function Reviewer({
           )}
         </main>
 
-        <aside className="w-96 shrink-0 border-l border-slate-200 bg-white flex flex-col shadow-xl">
+        <aside className="w-full lg:w-96 lg:shrink-0 border-t lg:border-t-0 lg:border-l border-slate-200 bg-white flex flex-col shadow-xl max-h-[50vh] lg:max-h-none overflow-hidden">
           <div className="flex-1 p-5 flex flex-col gap-5 overflow-auto">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">
@@ -454,27 +447,17 @@ export default function Reviewer({
                     )}
                   </div>
 
-                  <div className="pt-3 border-t border-slate-200 space-y-2">
-                    <MetadataItem
-                      label="Archivo"
-                      value={currentMetadata.file_name}
-                      mono
-                    />
-                    <MetadataItem
-                      label="Tamaño"
-                      value={formatFileSize(currentMetadata.size_bytes)}
-                    />
+                  <div className="pt-3 border-t border-slate-200">
+                    <a
+                      href={currentMetadata.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 transition cursor-pointer"
+                    >
+                      Ver en Registraduría
+                      <ExternalLinkIcon className="h-4 w-4" />
+                    </a>
                   </div>
-
-                  <a
-                    href={currentMetadata.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-flex items-center justify-center gap-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 transition"
-                  >
-                    Ver en Registraduría
-                    <ExternalLinkIcon className="h-4 w-4" />
-                  </a>
                 </div>
               )}
             </div>
@@ -509,7 +492,7 @@ export default function Reviewer({
             <button
               onClick={() => flagCurrent("error")}
               disabled={!currentPdf}
-              className="group w-full rounded-xl border border-amber-200 bg-white px-4 py-3.5 text-sm font-semibold text-amber-800 shadow-sm hover:bg-amber-50 hover:border-amber-300 hover:shadow-md hover:-translate-y-0.5 transition disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-sm"
+              className="group w-full rounded-xl border border-amber-200 bg-white px-4 py-3.5 text-sm font-semibold text-amber-800 shadow-sm hover:bg-amber-50 hover:border-amber-300 hover:shadow-md hover:-translate-y-0.5 transition disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-sm cursor-pointer"
             >
               <span className="flex items-center justify-center gap-2">
                 <BrokenFileIcon className="h-5 w-5 text-amber-600 group-hover:scale-110 transition" />
@@ -519,7 +502,7 @@ export default function Reviewer({
             <button
               onClick={() => flagCurrent("fraud")}
               disabled={!currentPdf}
-              className="group w-full rounded-xl bg-red-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-red-900/20 hover:bg-red-700 hover:shadow-xl hover:-translate-y-0.5 transition disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-lg"
+              className="group w-full rounded-xl bg-red-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-red-900/20 hover:bg-red-700 hover:shadow-xl hover:-translate-y-0.5 transition disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-lg cursor-pointer"
             >
               <span className="flex items-center justify-center gap-2">
                 <WarningIcon className="h-5 w-5 text-red-100 group-hover:scale-110 transition" />
