@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Header from "./Header";
 
 const PRELOAD_AHEAD = 3;
 const LOW_QUEUE_THRESHOLD = 5;
@@ -204,9 +204,7 @@ export default function Reviewer({ initialBatch, totalAvailable }: ReviewerProps
           data.accepted
             ? type === "error"
               ? "PDF marcado como no cargable"
-              : type === "fraud"
-                ? "PDF marcado para revisión humana"
-                : "PDF marcado como correcto"
+              : "PDF marcado para revisión humana"
             : "Ya habías marcado este PDF",
           "success",
         );
@@ -246,37 +244,26 @@ export default function Reviewer({ initialBatch, totalAvailable }: ReviewerProps
         <link key={url} rel="prefetch" href={url} />
       ))}
 
-      <header className="flex items-center justify-between px-4 py-3 border-b border-neutral-200 bg-white shrink-0">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="font-semibold text-lg hover:underline">
-            Revisión Actas E-14
-          </Link>
-          <Toggle
-            checked={zoomedOut}
-            onChange={setZoomedOut}
-            labelLeft="Normal"
-            labelRight="Vista completa"
-          />
+      <Header />
+
+      <div className="flex items-center justify-between px-4 py-2 border-b border-neutral-200 bg-white shrink-0">
+        <Toggle
+          checked={zoomedOut}
+          onChange={setZoomedOut}
+          labelLeft="Normal"
+          labelRight="Vista completa"
+        />
+        <div className="text-sm text-neutral-600">
+          {currentPdf ? (
+            <>
+              PDF {index + 1} de {totalInQueue} en cola
+              {totalAvailable > 0 && ` · ${totalAvailable} disponibles`}
+            </>
+          ) : (
+            "Cargando..."
+          )}
         </div>
-        <div className="flex items-center gap-4">
-          <Link
-            href="/alerts"
-            className="text-sm font-medium text-red-700 hover:underline"
-          >
-            Ver alertas
-          </Link>
-          <div className="text-sm text-neutral-600">
-            {currentPdf ? (
-              <>
-                PDF {index + 1} de {totalInQueue} en cola
-                {totalAvailable > 0 && ` · ${totalAvailable} disponibles`}
-              </>
-            ) : (
-              "Cargando..."
-            )}
-          </div>
-        </div>
-      </header>
+      </div>
 
       <div className="flex-1 flex overflow-hidden">
         <main className="flex-1 relative bg-neutral-900 flex items-center justify-center overflow-hidden">
@@ -358,7 +345,7 @@ export default function Reviewer({ initialBatch, totalAvailable }: ReviewerProps
                 <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
                   Marcas de otros usuarios
                 </p>
-                <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+                <div className="mt-2 grid grid-cols-2 gap-2 text-center">
                   <div className="rounded-lg bg-red-50 p-2">
                     <p className="text-lg font-semibold text-red-700">
                       {currentCounts.fraud_count}
@@ -373,25 +360,12 @@ export default function Reviewer({ initialBatch, totalAvailable }: ReviewerProps
                       No carga
                     </p>
                   </div>
-                  <div className="rounded-lg bg-green-50 p-2">
-                    <p className="text-lg font-semibold text-green-700">
-                      {currentCounts.ok_count}
-                    </p>
-                    <p className="text-[10px] uppercase text-green-600">OK</p>
-                  </div>
                 </div>
               </div>
             )}
           </div>
 
           <div className="p-4 border-t border-neutral-200 flex flex-col gap-3">
-            <button
-              onClick={() => flagCurrent("ok")}
-              disabled={!currentPdf}
-              className="w-full rounded-lg border border-neutral-300 bg-white px-4 py-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
-            >
-              Parece correcta
-            </button>
             <button
               onClick={() => flagCurrent("error")}
               disabled={!currentPdf}
