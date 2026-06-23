@@ -10,7 +10,7 @@ const PDF_DIR = path.join(__dirname, "pdfs");
 const METADATA_DIR = path.join(__dirname, "metadata");
 const LOG_FILE = path.join(__dirname, "download-errors.log");
 
-const CONCURRENCY = 5;
+const CONCURRENCY = 4;
 const MIN_DELAY_MS = 300;
 const MAX_DELAY_MS = 800;
 const REQUEST_TIMEOUT_MS = 120000;
@@ -117,6 +117,7 @@ function shouldRetryError(err) {
   if (err.name === "AbortError" || err.code === "ETIMEDOUT") return true;
   if (err.code === "ECONNRESET" || err.code === "ECONNREFUSED") return true;
   if (err.code === "ENOTFOUND" || err.code === "EAI_AGAIN") return false;
+  if (err.message?.startsWith("Unexpected content-type:")) return true;
   const status = err.status || 0;
   return status >= 500 || status === 429;
 }
@@ -304,7 +305,9 @@ async function runWorker(name, nextNode) {
 
   console.log("Scanning already downloaded PDFs...");
   const existingPdfs = new Set(fs.readdirSync(PDF_DIR));
-  const nodes = allNodes.filter((node) => !existingPdfs.has(buildFileName(node)));
+  const nodes = allNodes.filter(
+    (node) => !existingPdfs.has(buildFileName(node)),
+  );
   const total = nodes.length;
 
   console.log(`Remaining to download: ${total.toLocaleString()} nodes.`);
