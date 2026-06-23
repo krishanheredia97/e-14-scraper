@@ -1,29 +1,22 @@
-import { readdir } from "fs/promises";
-import path from "path";
+import { getDatabase } from "./sqlite/connection";
 
 const BATCH_SIZE = 10;
 
-function shuffle<T>(array: T[]): T[] {
-  const copy = [...array];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
+export function getRandomBatch(size = BATCH_SIZE) {
+  const db = getDatabase();
 
-export async function getRandomBatch(size = BATCH_SIZE) {
-  const pdfDir = path.join(process.cwd(), "public", "pdfs");
+  const totalStmt = db.prepare("SELECT COUNT(*) as count FROM documents");
+  const totalRow = totalStmt.get() as { count: number } | undefined;
+  const total = totalRow?.count ?? 0;
 
-  let entries: string[];
-  try {
-    entries = await readdir(pdfDir);
-  } catch {
-    entries = [];
+  if (total === 0) {
+    return { names: [] as string[], total: 0 };
   }
 
-  const pdfs = entries.filter((name) => name.toLowerCase().endsWith(".pdf"));
-  const batch = shuffle(pdfs).slice(0, size);
+  const stmt = db.prepare(
+    "SELECT file_name FROM documents ORDER BY RANDOM() LIMIT ?",
+  );
+  const rows = stmt.all(size) as { file_name: string }[];
 
-  return { names: batch, total: pdfs.length };
+  return { names: rows.map((row) => row.file_name), total };
 }
