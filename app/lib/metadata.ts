@@ -1,5 +1,6 @@
 import { readdir, readFile } from "fs/promises";
 import path from "path";
+import { cache } from "react";
 
 export interface DocumentMetadata {
   file_name: string;
@@ -92,7 +93,9 @@ export async function getAllMetadata(): Promise<DocumentMetadata[]> {
   return results.filter((m): m is DocumentMetadata => m !== undefined);
 }
 
-export async function getRandomBatch(size = BATCH_SIZE): Promise<{
+export const getRandomBatch = cache(async function getRandomBatch(
+  size = BATCH_SIZE,
+): Promise<{
   names: string[];
   metadata: Record<string, DocumentMetadata>;
   total: number;
@@ -128,4 +131,4 @@ export async function getRandomBatch(size = BATCH_SIZE): Promise<{
   }
 
   return { names, metadata, total };
-}
+});

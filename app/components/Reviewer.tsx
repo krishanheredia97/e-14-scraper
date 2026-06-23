@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Header from "./Header";
 import type { DocumentMetadata } from "../lib/metadata";
 
@@ -181,17 +181,12 @@ export default function Reviewer({
     { text: string; type: "success" | "error" } | null
   >(null);
   const [zoomedOut, setZoomedOut] = useState(false);
-  const [fingerprint] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return getOrCreateFingerprint();
-  });
-  const [mounted, setMounted] = useState(false);
-  const isPrevDisabled = !mounted || index === 0;
-
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
+  const fingerprint = useSyncExternalStore(
+    () => () => {},
+    () => getOrCreateFingerprint(),
+    () => "",
+  );
+  const isPrevDisabled = index === 0;
 
   const currentPdf = queue[index];
   const totalInQueue = queue.length;
