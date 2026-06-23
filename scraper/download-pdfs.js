@@ -1,7 +1,6 @@
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
-const { firefox } = require("playwright");
 const { ExifTool } = require("exiftool-vendored");
 const { BASE_URL } = require("./constants");
 
@@ -10,6 +9,13 @@ const exiftool = new ExifTool();
 const PDF_DIR = path.join(__dirname, "pdfs");
 const METADATA_DIR = path.join(__dirname, "metadata");
 const LOG_FILE = path.join(__dirname, "download-errors.log");
+
+const CONCURRENCY = 5;
+const MIN_DELAY_MS = 300;
+const MAX_DELAY_MS = 800;
+const REQUEST_TIMEOUT_MS = 120000;
+const MAX_RETRIES = 3;
+const BASE_RETRY_DELAY_MS = 1000;
 
 const departmentsTree = JSON.parse(
   fs.readFileSync(path.join(__dirname, "departmentsTree.json"), "utf8"),
@@ -21,7 +27,7 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function randomDelay(minMs = 200, maxMs = 1200) {
+function randomDelay(minMs = MIN_DELAY_MS, maxMs = MAX_DELAY_MS) {
   return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
 }
 
@@ -107,49 +113,67 @@ function buildOutputPaths(node) {
   };
 }
 
-async function downloadPdf(page, url, filePath) {
-  let body = null;
-  let status = null;
-  let contentType = null;
+function shouldRetryError(err) {
+  if (err.name === "AbortError" || err.code === "ETIMEDOUT") return true;
+  if (err.code === "ECONNRESET" || err.code === "ECONNREFUSED") return true;
+  if (err.code === "ENOTFOUND" || err.code === "EAI_AGAIN") return false;
+  const status = err.status || 0;
+  return status >= 500 || status === 429;
+}
 
-  const onResponse = async (response) => {
-    if (response.url() !== url) return;
-    status = response.status();
-    contentType = response.headers()["content-type"] || "";
+async function downloadPdf(url, filePath, signal) {
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (X11; Linux x86_64; rv:126.0) Gecko/20100101 Firefox/126.0",
+      Accept: "application/pdf",
+      "Accept-Language": "es-CO,es;q=0.8,en-US;q=0.5,en;q=0.3",
+      Referer: `${BASE_URL}/`,
+    },
+    redirect: "follow",
+    signal,
+  });
+
+  if (!response.ok) {
+    const error = new Error(`HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("pdf")) {
+    throw new Error(`Unexpected content-type: ${contentType}`);
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  fs.writeFileSync(filePath, buffer);
+}
+
+async function downloadWithRetry(url, filePath) {
+  let lastError;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      body = await response.body();
+      await downloadPdf(url, filePath, controller.signal);
+      return;
     } catch (err) {
-      console.error(`  Failed to read response body: ${err.message}`);
-    }
-  };
-
-  page.on("response", onResponse);
-
-  try {
-    try {
-      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 120000 });
-    } catch (err) {
-      if (!err.message.includes("Download is starting")) {
+      lastError = err;
+      if (attempt === MAX_RETRIES || !shouldRetryError(err)) {
         throw err;
       }
+      const delay =
+        BASE_RETRY_DELAY_MS * Math.pow(2, attempt) + Math.random() * 1000;
+      console.log(
+        `  Retry ${attempt + 1}/${MAX_RETRIES} after ${Math.round(delay)}ms (${err.message})`,
+      );
+      await sleep(delay);
+    } finally {
+      clearTimeout(timeout);
     }
-
-    await page.waitForTimeout(500);
-
-    if (!body) {
-      throw new Error("No response body captured");
-    }
-    if (status !== 200) {
-      throw new Error(`HTTP ${status}`);
-    }
-    if (!contentType.includes("pdf")) {
-      throw new Error(`Unexpected content-type: ${contentType}`);
-    }
-
-    fs.writeFileSync(filePath, body);
-  } finally {
-    page.off("response", onResponse);
   }
+  throw lastError;
 }
 
 async function extractXmpMetadata(filePath) {
@@ -218,6 +242,56 @@ function sortNodes(nodes) {
   });
 }
 
+async function processNode(node, index, total) {
+  const url = buildPdfUrl(node);
+  const location = lookupLocation(node);
+  const { pdfPath, metadataPath } = buildOutputPaths(node);
+
+  console.log(`[${index + 1}/${total}] ${url}`);
+  console.log(
+    `  Location: ${location.department} > ${location.municipality} > ${location.zone} > ${location.stand} (table ${node.numberStand})`,
+  );
+
+  try {
+    const downloadStartedAt = Date.now();
+    await downloadWithRetry(url, pdfPath);
+    const size = fs.statSync(pdfPath).size;
+    const xmp = await extractXmpMetadata(pdfPath);
+    const downloadedAt = new Date().toISOString();
+    const downloadDurationMs = Date.now() - downloadStartedAt;
+    writeMetadata(metadataPath, {
+      url,
+      size,
+      xmp,
+      node,
+      location,
+      downloadedAt,
+      downloadDurationMs,
+    });
+    console.log(
+      `  Saved: ${path.basename(pdfPath)} (${size.toLocaleString()} bytes)`,
+    );
+    console.log(`  XMP present: ${xmp.present}`);
+  } catch (err) {
+    console.error(`  ERROR: ${err.message}`);
+    console.error(
+      `  Lookup for manual verification: ${location.department} > ${location.municipality} > ${location.zone} > ${location.stand} (table ${node.numberStand})`,
+    );
+    logError({ node, location, url, error: err.message });
+  }
+}
+
+async function runWorker(name, nextNode) {
+  while (true) {
+    const item = nextNode();
+    if (!item) break;
+    await processNode(item.node, item.index, item.total);
+    const delay = randomDelay();
+    console.log(`  [${name}] Sleeping ${delay}ms...`);
+    await sleep(delay);
+  }
+}
+
 (async () => {
   fs.mkdirSync(PDF_DIR, { recursive: true });
   fs.mkdirSync(METADATA_DIR, { recursive: true });
@@ -225,72 +299,31 @@ function sortNodes(nodes) {
   const { data } = JSON.parse(
     fs.readFileSync(path.join(__dirname, "allTransmissionCodes.json"), "utf8"),
   );
-  const nodes = sortNodes([...data.status3.nodes, ...data.status11.nodes]);
+  const allNodes = sortNodes([...data.status3.nodes, ...data.status11.nodes]);
+  console.log(`Found ${allNodes.length.toLocaleString()} transmission nodes.`);
 
-  console.log(`Found ${nodes.length.toLocaleString()} transmission nodes.`);
+  console.log("Scanning already downloaded PDFs...");
+  const existingPdfs = new Set(fs.readdirSync(PDF_DIR));
+  const nodes = allNodes.filter((node) => !existingPdfs.has(buildFileName(node)));
+  const total = nodes.length;
 
-  const browser = await firefox.launch({
-    headless: process.env.HEADLESS !== "false",
-  });
-  const page = await browser.newPage();
+  console.log(`Remaining to download: ${total.toLocaleString()} nodes.`);
+  console.log(`Concurrency: ${CONCURRENCY} workers`);
 
-  try {
-    for (let i = 0; i < nodes.length; i++) {
-      const node = nodes[i];
-      const url = buildPdfUrl(node);
-      const location = lookupLocation(node);
-      const { pdfPath, metadataPath } = buildOutputPaths(node);
-
-      if (fs.existsSync(pdfPath)) {
-        console.log(
-          `[${i + 1}/${nodes.length}] SKIP (already downloaded): ${path.basename(pdfPath)}`,
-        );
-        continue;
-      }
-
-      console.log(`[${i + 1}/${nodes.length}] ${url}`);
-      console.log(
-        `  Location: ${location.department} > ${location.municipality} > ${location.zone} > ${location.stand} (table ${node.numberStand})`,
-      );
-      try {
-        const downloadStartedAt = Date.now();
-        await downloadPdf(page, url, pdfPath);
-        const size = fs.statSync(pdfPath).size;
-        const xmp = await extractXmpMetadata(pdfPath);
-        const downloadedAt = new Date().toISOString();
-        const downloadDurationMs = Date.now() - downloadStartedAt;
-        writeMetadata(metadataPath, {
-          url,
-          size,
-          xmp,
-          node,
-          location,
-          downloadedAt,
-          downloadDurationMs,
-        });
-        console.log(
-          `  Saved: ${path.basename(pdfPath)} (${size.toLocaleString()} bytes)`,
-        );
-        console.log(`  XMP present: ${xmp.present}`);
-      } catch (err) {
-        console.error(`  ERROR: ${err.message}`);
-        console.error(
-          `  Lookup for manual verification: ${location.department} > ${location.municipality} > ${location.zone} > ${location.stand} (table ${node.numberStand})`,
-        );
-        logError({ node, location, url, error: err.message });
-      }
-
-      if (i < nodes.length - 1) {
-        const delay = randomDelay();
-        console.log(`  Sleeping ${delay}ms...`);
-        await sleep(delay);
-      }
-    }
-  } finally {
-    await page.close();
-    await browser.close();
-    await exiftool.end();
+  let currentIndex = 0;
+  function nextNode() {
+    if (currentIndex >= total) return null;
+    const item = { node: nodes[currentIndex], index: currentIndex, total };
+    currentIndex++;
+    return item;
   }
+
+  const workers = Array.from({ length: CONCURRENCY }, (_, i) =>
+    runWorker(`worker-${i + 1}`, nextNode),
+  );
+
+  await Promise.all(workers);
+  await exiftool.end();
 
   console.log("\nDone.");
 })();
