@@ -174,85 +174,95 @@ export default function Reviewer({ initialBatch, totalAvailable }: ReviewerProps
         </div>
       </header>
 
-      <main className="flex-1 relative flex items-center justify-center overflow-hidden">
-        {currentPdf ? (
-          <>
-            <button
-              aria-label="Anterior"
-              onClick={prevPdf}
-              disabled={index === 0}
-              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/90 shadow hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <ChevronLeft className="h-8 w-8" />
-            </button>
+      <div className="flex-1 flex overflow-hidden">
+        <main className="flex-1 relative bg-neutral-900 flex items-center justify-center overflow-hidden">
+          {currentPdf ? (
+            <>
+              <button
+                aria-label="Anterior"
+                onClick={prevPdf}
+                disabled={index === 0}
+                className="absolute left-3 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/90 shadow hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="h-8 w-8" />
+              </button>
 
-            <div className="w-full h-full px-16 py-4">
-              {loadError ? (
-                <div className="h-full flex flex-col items-center justify-center gap-4 rounded-xl border border-neutral-200 bg-white">
-                  <p className="text-neutral-700">No se pudo cargar el PDF.</p>
-                  <button
-                    onClick={() => setLoadError(false)}
-                    className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-                  >
-                    Intentar de nuevo
-                  </button>
-                </div>
+              <div className="h-[85vh] w-[min(45vw,650px)]">
+                {loadError ? (
+                  <div className="h-full flex flex-col items-center justify-center gap-4 rounded-xl border border-neutral-700 bg-neutral-800 text-white">
+                    <p>No se pudo cargar el PDF.</p>
+                    <button
+                      onClick={() => setLoadError(false)}
+                      className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                    >
+                      Intentar de nuevo
+                    </button>
+                  </div>
+                ) : (
+                  <iframe
+                    key={pdfUrl}
+                    src={pdfUrl}
+                    title={`Acta ${currentPdf}`}
+                    className="h-full w-full rounded-lg border border-neutral-700 bg-neutral-900"
+                    onError={() => setLoadError(true)}
+                  />
+                )}
+              </div>
+
+              <button
+                aria-label="Siguiente"
+                onClick={nextPdf}
+                className="absolute right-3 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/90 shadow hover:bg-white"
+              >
+                <ChevronRight className="h-8 w-8" />
+              </button>
+            </>
+          ) : (
+            <div className="text-center text-neutral-300">
+              <p>No hay PDFs disponibles.</p>
+              <p className="text-sm text-neutral-500 mt-1">
+                Coloca los archivos en <code>public/pdfs</code>.
+              </p>
+            </div>
+          )}
+        </main>
+
+        <aside className="w-72 shrink-0 border-l border-neutral-200 bg-white flex flex-col">
+          <div className="flex-1 p-4 flex flex-col gap-4 overflow-auto">
+            <div>
+              <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
+                Archivo
+              </p>
+              {currentPdf ? (
+                <p className="mt-1 text-sm text-neutral-800 break-all">{currentPdf}</p>
               ) : (
-                <iframe
-                  key={pdfUrl}
-                  src={pdfUrl}
-                  title={`Acta ${currentPdf}`}
-                  className="w-full h-full rounded-xl border border-neutral-200 bg-white"
-                  onError={() => setLoadError(true)}
-                />
+                <p className="mt-1 text-sm text-neutral-400">—</p>
               )}
             </div>
-
-            <button
-              aria-label="Siguiente"
-              onClick={nextPdf}
-              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 p-3 rounded-full bg-white/90 shadow hover:bg-white"
-            >
-              <ChevronRight className="h-8 w-8" />
-            </button>
-          </>
-        ) : (
-          <div className="text-center">
-            <p className="text-neutral-600">No hay PDFs disponibles.</p>
-            <p className="text-sm text-neutral-500 mt-1">
-              Coloca los archivos en <code>public/pdfs</code>.
-            </p>
           </div>
-        )}
-      </main>
 
-      <footer className="shrink-0 border-t border-neutral-200 bg-white px-4 py-4">
-        <div className="mx-auto flex max-w-2xl flex-col gap-3">
-          {currentPdf && (
-            <p className="text-center text-xs text-neutral-500 truncate">{currentPdf}</p>
-          )}
-          <div className="flex justify-center gap-3">
+          <div className="p-4 border-t border-neutral-200 flex flex-col gap-3">
             <button
               onClick={() => flagCurrent("error")}
               disabled={!currentPdf}
-              className="flex-1 rounded-lg border border-neutral-300 bg-white px-4 py-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+              className="w-full rounded-lg border border-neutral-300 bg-white px-4 py-3 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
             >
               No carga el PDF
             </button>
             <button
               onClick={() => flagCurrent("fraud")}
               disabled={!currentPdf}
-              className="flex-1 rounded-lg bg-red-600 px-4 py-3 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              className="w-full rounded-lg bg-red-600 px-4 py-3 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
             >
-              Posible fraude / inconsistencia
+              Posible fraude / inconsisten­cia
             </button>
           </div>
-        </div>
-      </footer>
+        </aside>
+      </div>
 
       {message && (
         <div
-          className={`fixed bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full text-sm font-medium shadow-lg ${
+          className={`fixed bottom-6 left-6 px-4 py-2 rounded-full text-sm font-medium shadow-lg ${
             message.type === "success" ? "bg-green-700 text-white" : "bg-red-700 text-white"
           }`}
         >
