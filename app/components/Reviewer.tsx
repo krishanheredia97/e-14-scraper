@@ -400,9 +400,7 @@ export default function Reviewer({
             <div className="text-center text-slate-300 px-4">
               <p className="text-lg">No hay PDFs disponibles.</p>
               <p className="text-sm text-slate-500 mt-2">
-                Asegúrate de que los archivos estén en la carpeta{" "}
-                <code className="bg-slate-900 px-2 py-1 rounded text-slate-400">pdfs/</code>{" "}
-                del repositorio.
+                Asegúrate de que los archivos estén disponibles en el bucket S3 configurado.
               </p>
             </div>
           )}
