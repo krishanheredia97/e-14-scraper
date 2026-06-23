@@ -24,7 +24,9 @@ export default async function AlertsPage() {
 
           {alerts.length === 0 ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-              <p className="text-slate-600 text-lg">Aún no hay alertas registradas.</p>
+              <p className="text-slate-600 text-lg">
+                Aún no hay alertas registradas.
+              </p>
             </div>
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -34,7 +36,7 @@ export default async function AlertsPage() {
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
                       Ubicación
                     </th>
-                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right w-32">
+                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right w-36">
                       Alertas
                     </th>
                     <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-40">
@@ -57,11 +59,14 @@ export default async function AlertsPage() {
 }
 
 function AlertRow({ alert }: { alert: AlertRow }) {
-  const location = [alert.department, alert.municipality, alert.zone, alert.stand]
+  const location = [
+    alert.department,
+    alert.municipality,
+    alert.zone,
+    alert.stand,
+  ]
     .filter(Boolean)
     .join(" · ");
-
-  const totalAlerts = alert.fraud_count + alert.error_count;
 
   return (
     <tr className="hover:bg-slate-50/80 transition group">
@@ -72,16 +77,37 @@ function AlertRow({ alert }: { alert: AlertRow }) {
             <p className="font-semibold text-slate-900">
               {location || "Ubicación desconocida"}
             </p>
-            <p className="mt-0.5 text-xs font-mono text-slate-400 break-all max-w-md">
-              {alert.file_name}
-            </p>
+            {alert.stand_code ? (
+              <p className="mt-1 text-xs text-slate-500">
+                Mesa {alert.stand_code}
+              </p>
+            ) : null}
           </div>
         </div>
       </td>
       <td className="px-6 py-4 text-right">
-        <span className="inline-flex items-center justify-center min-w-[2.5rem] rounded-full bg-red-50 px-3 py-1 text-sm font-bold text-red-700 border border-red-100">
-          {totalAlerts}
-        </span>
+        <div className="inline-flex flex-col items-end gap-1.5">
+          {alert.fraud_count > 0 ? (
+            <span className="inline-flex items-center justify-between gap-3 rounded-full bg-red-50 px-3 py-1 border border-red-100 min-w-[84px]">
+              <span className="text-xs font-semibold text-red-600">
+                Irregularidad
+              </span>
+              <span className="text-sm font-bold text-red-700">
+                {alert.fraud_count}
+              </span>
+            </span>
+          ) : null}
+          {alert.error_count > 0 ? (
+            <span className="inline-flex items-center justify-between gap-3 rounded-full bg-amber-50 px-3 py-1 border border-amber-100 min-w-[84px]">
+              <span className="text-xs font-semibold text-amber-600">
+                No carga
+              </span>
+              <span className="text-sm font-bold text-amber-700">
+                {alert.error_count}
+              </span>
+            </span>
+          ) : null}
+        </div>
       </td>
       <td className="px-6 py-4">
         <a

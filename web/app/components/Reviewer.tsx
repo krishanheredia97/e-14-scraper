@@ -445,6 +445,12 @@ export default function Reviewer({
                     {currentMetadata.stand && (
                       <MetadataItem label="Puesto" value={currentMetadata.stand} />
                     )}
+                    {currentMetadata.stand_code && (
+                      <MetadataItem
+                        label="Número de mesa"
+                        value={currentMetadata.stand_code}
+                      />
+                    )}
                   </div>
 
                   <div className="pt-3 border-t border-slate-200">

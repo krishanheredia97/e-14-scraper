@@ -11,6 +11,7 @@ interface MetadataPayload {
   municipality?: string;
   zone?: string;
   stand?: string;
+  numberStand?: string;
 }
 
 export async function seedDocumentsFromMetadata(): Promise<{
@@ -29,8 +30,8 @@ export async function seedDocumentsFromMetadata(): Promise<{
 
   const insert = db.prepare(
     `INSERT OR IGNORE INTO documents
-     (file_name, url, size_bytes, downloaded_at, department, municipality, zone, stand)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+     (file_name, url, size_bytes, downloaded_at, department, municipality, zone, stand, stand_code)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
 
   let inserted = 0;
@@ -47,6 +48,7 @@ export async function seedDocumentsFromMetadata(): Promise<{
         row.municipality ?? null,
         row.zone ?? null,
         row.stand ?? null,
+        row.numberStand ?? null,
       );
       if (result.changes > 0) {
         inserted++;
@@ -88,13 +90,14 @@ export interface DocumentMetadata {
   municipality: string | null;
   zone: string | null;
   stand: string | null;
+  stand_code: string | null;
   size_bytes: number | null;
 }
 
 export function getDocumentMetadataByFileName(fileName: string): DocumentMetadata | undefined {
   const db = getDatabase();
   const stmt = db.prepare(
-    "SELECT id, file_name, url, department, municipality, zone, stand, size_bytes FROM documents WHERE file_name = ?",
+    "SELECT id, file_name, url, department, municipality, zone, stand, stand_code, size_bytes FROM documents WHERE file_name = ?",
   );
   return stmt.get(fileName) as DocumentMetadata | undefined;
 }

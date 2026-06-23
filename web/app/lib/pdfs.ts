@@ -15,7 +15,7 @@ export function getRandomBatch(size = BATCH_SIZE) {
   }
 
   const stmt = db.prepare(
-    "SELECT file_name, url, department, municipality, zone, stand, size_bytes FROM documents ORDER BY RANDOM() LIMIT ?",
+    "SELECT file_name, url, department, municipality, zone, stand, stand_code, size_bytes FROM documents ORDER BY RANDOM() LIMIT ?",
   );
   const rows = stmt.all(size) as DocumentMetadata[];
 

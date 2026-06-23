@@ -34,6 +34,7 @@ export interface AlertRow {
   municipality: string | null;
   zone: string | null;
   stand: string | null;
+  stand_code: string | null;
   error_count: number;
   fraud_count: number;
   ok_count: number;
@@ -55,6 +56,7 @@ export function getAlerts(
        d.municipality,
        d.zone,
        d.stand,
+       d.stand_code,
        COALESCE(fc.error_count, 0) as error_count,
        COALESCE(fc.fraud_count, 0) as fraud_count,
        COALESCE(fc.ok_count, 0) as ok_count

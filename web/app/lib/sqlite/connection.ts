@@ -87,7 +87,7 @@ function initializeSchema(database: Database.Database): void {
     )
   `);
 
-  const migrationFiles = ["001_initial_schema.sql"];
+  const migrationFiles = ["001_initial_schema.sql", "002_add_stand_code.sql"];
 
   for (const filename of migrationFiles) {
     try {
