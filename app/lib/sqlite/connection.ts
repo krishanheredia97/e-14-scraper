@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { mkdirSync, readFileSync } from "fs";
 import path from "path";
-import { seedDocumentsFromMetadata } from "./documents";
+import { syncDocumentsFromMetadata } from "./documents";
 
 function getDataDirectory(): string {
   if (process.env.DATA_DIR) {
@@ -43,7 +43,7 @@ export function getDatabase(): Database.Database {
     initializeSchema(db);
     db.pragma("foreign_keys = ON");
 
-    maybeSeedDocuments(db);
+    syncDocuments();
 
     const FIVE_MINUTES_MS = 5 * 60 * 1000;
     setInterval(() => {
@@ -125,28 +125,18 @@ function initializeSchema(database: Database.Database): void {
   database.pragma("foreign_keys = ON");
 }
 
-function maybeSeedDocuments(database: Database.Database): void {
-  try {
-    const countRow = database
-      .prepare("SELECT COUNT(*) as count FROM documents")
-      .get() as { count: number } | undefined;
-
-    if ((countRow?.count ?? 0) > 0) {
-      return;
-    }
-
-    seedDocumentsFromMetadata()
-      .then((result) => {
+function syncDocuments(): void {
+  syncDocumentsFromMetadata()
+    .then((result) => {
+      if (result.inserted > 0) {
         console.log(
-          `Seeded documents: ${result.inserted} inserted, ${result.skipped} skipped`,
+          `Synced documents: ${result.inserted} inserted, ${result.skipped} already present`,
         );
-      })
-      .catch((error) => {
-        console.error("Failed to seed documents:", error);
-      });
-  } catch (error) {
-    console.error("Could not check documents count for seeding:", error);
-  }
+      }
+    })
+    .catch((error) => {
+      console.error("Failed to sync documents:", error);
+    });
 }
 
 process.on("SIGINT", () => {

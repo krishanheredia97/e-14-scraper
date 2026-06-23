@@ -8,7 +8,7 @@ export async function GET(
 ) {
   const { fileName } = await params;
   const decoded = decodeURIComponent(fileName);
-  const pdfPath = path.join(process.cwd(), "..", "pdfs", decoded);
+  const pdfPath = path.join(process.cwd(), "scraper", "pdfs", decoded);
 
   try {
     const stats = await stat(pdfPath);

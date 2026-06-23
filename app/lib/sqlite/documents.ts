@@ -14,7 +14,7 @@ interface MetadataPayload {
   numberStand?: string;
 }
 
-export async function seedDocumentsFromMetadata(): Promise<{
+export async function syncDocumentsFromMetadata(): Promise<{
   inserted: number;
   skipped: number;
 }> {
@@ -27,6 +27,11 @@ export async function seedDocumentsFromMetadata(): Promise<{
   } catch {
     return { inserted: 0, skipped: 0 };
   }
+
+  const existingRows = db
+    .prepare("SELECT file_name FROM documents")
+    .all() as { file_name: string }[];
+  const existing = new Set(existingRows.map((row) => row.file_name));
 
   const insert = db.prepare(
     `INSERT OR IGNORE INTO documents
@@ -60,6 +65,12 @@ export async function seedDocumentsFromMetadata(): Promise<{
 
   const rows: MetadataPayload[] = [];
   for (const file of files.filter((f) => f.toLowerCase().endsWith(".json"))) {
+    const pdfFileName = file.replace(/\.json$/i, ".pdf");
+    if (existing.has(pdfFileName)) {
+      skipped++;
+      continue;
+    }
+
     try {
       const content = await readFile(path.join(metadataDir, file), "utf8");
       const parsed = JSON.parse(content) as MetadataPayload;
